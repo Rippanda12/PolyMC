@@ -30,3 +30,11 @@ jobs:
       build_type: Debug
     secrets:
       SPARKLE_ED25519_KEY: ${{ secrets.SPARKLE_ED25519_KEY }}
+      
+  build_debug_arm:
+    name: Build Debug (Arm)
+    uses: ./.github/workflows/build-arm-linux.yml
+    with:
+      build_type: Debug
+    secrets:
+      SPARKLE_ED25519_KEY: ${{ secrets.SPARKLE_ED25519_KEY }}
