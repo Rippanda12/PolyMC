@@ -85,7 +85,7 @@ jobs:
           githubToken: ${{ github.token }}
           
           setup: |
-            mkdir -p /artifacts
+            sudo mkdir -p /artifacts
             
           dockerRunArgs: | 
             --volume "/artifacts:/artifacts" --volume "${GITHUB_WORKSPACE}:/polymc"
