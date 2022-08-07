@@ -18,36 +18,48 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-20.04
+          - trick_gha_into_showing_readable_name: '[Linux, Qt5, x86_64]'
+            os: ubuntu-20.04
             arm: false
             qt_ver: 5
-            
-          - os: ubuntu-20.04
-            qt_ver: 5
-            distro: ubuntu20.04
-            arm: true
-
-          - os: ubuntu-20.04
+          
+          - trick_gha_into_showing_readable_name: '[Linux, Qt6, x86_64]'
+            os: ubuntu-20.04
             qt_ver: 6
             arm: false
             qt_host: linux
             qt_version: '6.2.4'
             qt_modules: 'qt5compat qtimageformats'
             qt_path: /home/runner/work/PolyMC/Qt
+            
+          - trick_gha_into_showing_readable_name: '[Linux, Qt5, arm64]'
+            os: ubuntu-20.04
+            qt_ver: 5
+            arm: true
+            distro: ubuntu20.04
+            
+          - trick_gha_into_showing_readable_name: '[Linux, Qt6, arm64]'
+            os: ubuntu-20.04
+            qt_ver: 6
+            arm: true
+            distro: ubuntu22.04
 
-          - os: windows-2022
+          - trick_gha_into_showing_readable_name: '[WinLegacy, Qt5, x86_64]'
+            os: windows-2022
             arm: false
             name: "Windows-Legacy"
             msystem: mingw32
             qt_ver: 5
 
-          - os: windows-2022
+          - trick_gha_into_showing_readable_name: '[Windows, Qt6, x86_64]'
+            os: windows-2022
             arm: false
             name: "Windows"
             msystem: mingw32
             qt_ver: 6
-
-          - os: macos-12
+          
+          - trick_gha_into_showing_readable_name: '[MacOS, Qt6, x86_64]'
+            os: macos-12
             arm: false
             macosx_deployment_target: 10.14
             qt_ver: 6
@@ -98,6 +110,48 @@ jobs:
             apt-get -y install git cmake gcc g++ sudo openjdk-8-jdk build-essential pkg-config zlib1g-dev
             apt-get -y install ninja-build extra-cmake-modules scdoc
             apt-get -y install qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools libqt5core5a libqt5network5 libqt5gui5
+          
+          run: |
+            cd /polymc/ 
+            echo 'Configure CMake'
+            cmake -S . -B ${{ env.BUILD_DIR }} -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} -DENABLE_LTO=ON -DLauncher_BUILD_PLATFORM=Linux -DCMAKE_C_COMPILER_LAUNCHER=${{ env.CCACHE_VAR }} -DCMAKE_CXX_COMPILER_LAUNCHER=${{ env.CCACHE_VAR }} -DLauncher_QT_VERSION_MAJOR=${{ matrix.qt_ver }} -G Ninja
+            echo 'Build'
+            cmake --build ${{ env.BUILD_DIR }}
+            echo 'Test'
+            ctest --test-dir build --output-on-failure
+            echo 'Package (Linux)'
+            cmake --install ${{ env.BUILD_DIR }} --prefix ${{ env.INSTALL_DIR }}
+            cd ${{ env.INSTALL_DIR }}
+            tar --owner root --group root -czf /artifacts/PolyMC.tar.gz *
+            cd /polymc/
+            cmake --install ${{ env.BUILD_DIR }} --prefix ${{ env.INSTALL_PORTABLE_DIR }}
+            cmake --install ${{ env.BUILD_DIR }} --prefix ${{ env.INSTALL_PORTABLE_DIR }} --component portable
+            cd ${{ env.INSTALL_PORTABLE_DIR }}
+            tar -czf /artifacts/PolyMC-portable.tar.gz *
+            
+      - name: Build (Linux, Qt 6, Arm64)
+        if: matrix.arm == true && matrix.qt_ver == 6
+        uses: uraimo/run-on-arch-action@v2
+        with:
+          arch: aarch64
+          distro: ${{ matrix.distro }}
+          # cache the image
+          githubToken: ${{ github.token }}
+          
+          setup: |
+            sudo mkdir -p /artifacts
+            
+          dockerRunArgs: | 
+            --volume "/artifacts:/artifacts" --volume "${GITHUB_WORKSPACE}:/polymc"
+          
+          shell: /bin/sh
+          
+          install: |
+            echo ":aaaaaaaaaaaa:"
+            apt-get -y update
+            apt-get -y install git cmake gcc g++ sudo openjdk-8-jdk build-essential pkg-config zlib1g-dev
+            apt-get -y install ninja-build extra-cmake-modules scdoc
+            apt-get -y install qt6-base-dev libqt6core5compat6-dev qt6-base libqt6core5compat6 qt6-image-formats-plugins
           
           run: |
             cd /polymc/ 
@@ -170,7 +224,6 @@ jobs:
               ${{ matrix.os }}-qt${{ matrix.qt_ver }}
 
       - name: Set short version
-        if: matrix.arm == false
         shell: bash
         run: |
           ver_short=`git rev-parse --short HEAD`
@@ -420,7 +473,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: PolyMC-${{ runner.os }}-Portable-${{ env.VERSION }}-${{ inputs.build_type }}
-          path: /artifacts/PolyMC-portable.tar.gz
+          path: PolyMC-portable.tar.gz
           
       - name: Upload binary tarball (Linux, Qt 5, Arm64)
         if: runner.os == 'Linux' && matrix.qt_ver != 6 && matrix.arm == true
@@ -434,6 +487,20 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: PolyMC-${{ runner.os }}-arm64-Portable-${{ env.VERSION }}-${{ inputs.build_type }}
+          path: /artifacts/PolyMC-portable.tar.gz
+          
+      - name: Upload binary tarball (Linux, Qt 6, Arm64)
+        if: runner.os == 'Linux' && matrix.qt_ver != 5 && matrix.arm == true
+        uses: actions/upload-artifact@v3
+        with:
+          name: PolyMC-${{ runner.os }}-arm64-Qt6-${{ env.VERSION }}-${{ inputs.build_type }}
+          path: /artifacts/PolyMC.tar.gz
+
+      - name: Upload binary tarball (Linux, portable, Qt 6, Arm64)
+        if: runner.os == 'Linux' && matrix.qt_ver != 5 && matrix.arm == true
+        uses: actions/upload-artifact@v3
+        with:
+          name: PolyMC-${{ runner.os }}-arm64-Qt6-Portable-${{ env.VERSION }}-${{ inputs.build_type }}
           path: /artifacts/PolyMC-portable.tar.gz
 
       - name: Upload binary tarball (Linux, Qt 6)
