@@ -93,10 +93,10 @@ jobs:
           shell: /bin/sh
           
           install: |
-            sudo apt-get -y update
-            sudo apt-get -y install git cmake gcc
-            sudo apt-get -y install ninja-build extra-cmake-modules scdoc
-            sudo apt-get -y install qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools libqt5core5a libqt5network5 libqt5gui5
+            apt-get -y update
+            apt-get -y install git cmake gcc sudo
+            apt-get -y install ninja-build extra-cmake-modules scdoc
+            apt-get -y install qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools libqt5core5a libqt5network5 libqt5gui5
           
           run: |
             cd /polymc/ 
