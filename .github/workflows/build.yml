@@ -79,7 +79,7 @@ jobs:
         if: matrix.arm == true && matrix.qt_ver == 5
         uses: uraimo/run-on-arch-action@v2
         with:
-          arch: arm64
+          arch: aarch64
           distro: ${{ matrix.distro }}
           # cache the image
           githubToken: ${{ github.token }}
