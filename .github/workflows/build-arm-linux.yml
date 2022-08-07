@@ -1,0 +1,145 @@
+name: Build
+
+on:
+  workflow_call:
+    inputs:
+      build_type:
+        description: Type of build (Debug, Release, RelWithDebInfo, MinSizeRel)
+        type: string
+        default: Debug
+    secrets:
+      SPARKLE_ED25519_KEY:
+        description: Private key for signing Sparkle updates
+        required: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-20.04
+            qt_ver: 5
+
+          - os: ubuntu-20.04
+            qt_ver: 6
+            qt_host: linux
+            qt_version: '6.2.4'
+            qt_modules: 'qt5compat qtimageformats'
+            qt_path: /home/runner/work/PolyMC/Qt
+
+    runs-on: ${{ matrix.os }}
+
+    env:
+      INSTALL_DIR: "install"
+      INSTALL_PORTABLE_DIR: "install-portable"
+      INSTALL_APPIMAGE_DIR: "install-appdir"
+      BUILD_DIR: "build"
+      CCACHE_VAR: ""
+
+    steps:
+      - uses: pguyot/arm-runner-action@v2
+      ##
+      # PREPARE
+      ##
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: 'true'
+      
+      - name: Setup ccache
+        if: runner.os != 'Windows' && inputs.build_type == 'Debug'
+        uses: hendrikmuhs/ccache-action@v1.2.1
+        with:
+          key: ${{ matrix.os }}-qt${{ matrix.qt_ver }}
+          
+      - name: Use ccache on Debug builds only
+        if: inputs.build_type == 'Debug'
+        shell: bash
+        run: |
+          echo "CCACHE_VAR=ccache" >> $GITHUB_ENV
+
+      - name: Set short version
+        shell: bash
+        run: |
+          ver_short=`git rev-parse --short HEAD`
+          echo "VERSION=$ver_short" >> $GITHUB_ENV
+      - name: Install Dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install ninja-build extra-cmake-modules scdoc
+      - name: Install Qt (Linux)
+        if: runner.os == 'Linux' && matrix.qt_ver != 6
+        run: |
+          sudo apt-get -y install qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools libqt5core5a libqt5network5 libqt5gui5
+      ##
+      # CONFIGURE
+      ##
+      - name: Configure CMake (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cmake -S . -B ${{ env.BUILD_DIR }} -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} -DENABLE_LTO=ON -DLauncher_BUILD_PLATFORM=Linux -DCMAKE_C_COMPILER_LAUNCHER=${{ env.CCACHE_VAR }} -DCMAKE_CXX_COMPILER_LAUNCHER=${{ env.CCACHE_VAR }} -DLauncher_QT_VERSION_MAJOR=${{ matrix.qt_ver }} -G Ninja
+      ##
+      # BUILD
+      ##
+
+      - name: Build
+        if: runner.os != 'Windows'
+        run: |
+          cmake --build ${{ env.BUILD_DIR }}
+      ##
+      # TEST
+      ##
+
+      - name: Test
+        if: runner.os != 'Windows'
+        run: |
+          ctest --test-dir build --output-on-failure
+      ##
+      # PACKAGE BUILDS
+      ##
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cmake --install ${{ env.BUILD_DIR }} --prefix ${{ env.INSTALL_DIR }}
+          cd ${{ env.INSTALL_DIR }}
+          tar --owner root --group root -czf ../PolyMC.tar.gz *
+      - name: Package (Linux, portable)
+        if: runner.os == 'Linux'
+        run: |
+          cmake --install ${{ env.BUILD_DIR }} --prefix ${{ env.INSTALL_PORTABLE_DIR }}
+          cmake --install ${{ env.BUILD_DIR }} --prefix ${{ env.INSTALL_PORTABLE_DIR }} --component portable
+          cd ${{ env.INSTALL_PORTABLE_DIR }}
+          tar -czf ../PolyMC-portable.tar.gz *
+      ##
+      # UPLOAD BUILDS
+      ##
+      - name: Upload binary tarball (Linux, Qt 5)
+        if: runner.os == 'Linux' && matrix.qt_ver != 6
+        uses: actions/upload-artifact@v3
+        with:
+          name: PolyMC-${{ runner.os }}-arm64-${{ env.VERSION }}-${{ inputs.build_type }}
+          path: PolyMC.tar.gz
+
+      - name: Upload binary tarball (Linux, portable, Qt 5)
+        if: runner.os == 'Linux' && matrix.qt_ver != 6
+        uses: actions/upload-artifact@v3
+        with:
+          name: PolyMC-${{ runner.os }}-arm64-Portable-${{ env.VERSION }}-${{ inputs.build_type }}
+          path: PolyMC-portable.tar.gz
+
+      - name: Upload binary tarball (Linux, Qt 6)
+        if: runner.os == 'Linux' && matrix.qt_ver !=5
+        uses: actions/upload-artifact@v3
+        with:
+          name: PolyMC-${{ runner.os }}-arm64-Qt6-${{ env.VERSION }}-${{ inputs.build_type }}
+          path: PolyMC.tar.gz
+
+      - name: Upload binary tarball (Linux, portable, Qt 6)
+        if: runner.os == 'Linux' && matrix.qt_ver != 5
+        uses: actions/upload-artifact@v3
+        with:
+          name: PolyMC-${{ runner.os }}-arm64-Qt6-Portable-${{ env.VERSION }}-${{ inputs.build_type }}
+          path: PolyMC-portable.tar.gz
