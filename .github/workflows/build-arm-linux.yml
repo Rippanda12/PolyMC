@@ -56,7 +56,7 @@ jobs:
               cd ${repository_path}
               ver_short=`git rev-parse --short HEAD`
               sudo apt-get -y update
-              sudo apt-get -y install ninja-build extra-cmake-modules scdoc
+              sudo apt-get -y install ninja-build extra-cmake-modules scdoc cmake gcc git
               sudo apt-get -y install qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools libqt5core5a libqt5network5 libqt5gui5
               cmake -S . -B ${{ env.BUILD_DIR }} -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} -DENABLE_LTO=ON -DLauncher_BUILD_PLATFORM=Linux -DCMAKE_C_COMPILER_LAUNCHER=${{ env.CCACHE_VAR }} -DCMAKE_CXX_COMPILER_LAUNCHER=${{ env.CCACHE_VAR }} -DLauncher_QT_VERSION_MAJOR=${{ matrix.qt_ver }} -G Ninja
               cmake --build ${{ env.BUILD_DIR }}
