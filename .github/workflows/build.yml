@@ -314,7 +314,7 @@ jobs:
             echo 'Build'
             cmake --build ${{ env.BUILD_DIR }}
             echo 'Test'
-            ctest --test-dir build --output-on-failure
+            ctest --test-dir /polymc/${{ env.BUILD_DIR }} --output-on-failure
             echo 'Package (Linux)'
             cmake --install ${{ env.BUILD_DIR }} --prefix ${{ env.INSTALL_DIR }}
             cd ${{ env.INSTALL_DIR }}
